@@ -1,0 +1,7 @@
+﻿# Gitignore for netbsd project: ignore giant binaries (sets and iso)
+sets/
+sets_11.0/
+iso/
+*.iso
+*.tar.xz
+*.log

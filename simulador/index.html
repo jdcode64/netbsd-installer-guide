@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulador Oficial NetBSD 11.0 (sysinst) - Bilingüe & Mobile Friendly</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0b0f19">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: #141b2d;
+      --term-bg: #000084;
+      --term-fg: #ffffff;
+      --term-accent: #ffff55;
+      --term-border: #aaaaaa;
+      --term-sel-bg: #00aaaa;
+      --term-sel-fg: #000000;
+      --accent-color: #38bdf8;
+      --accent-hover: #0284c7;
+      --text-muted: #94a3b8;
+      --panel-border: #1e293b;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      padding-bottom: 24px;
+    }
+
+    /* Header */
+    header {
+      background: #0f172a;
+      border-bottom: 1px solid var(--panel-border);
+      padding: 12px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .badge-ver, .badge-lang {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-ver { background: #0369a1; color: #fff; }
+    .badge-lang { background: #059669; color: #fff; }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+    }
+
+    @media (min-width: 768px) {
+      .nav-tabs { width: auto; }
+      header { padding: 12px 24px; }
+      .brand { font-size: 1.15rem; }
+    }
+
+    .nav-btn {
+      flex: 1;
+      text-align: center;
+      background: transparent;
+      border: 1px solid var(--panel-border);
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-btn.active, .nav-btn:hover {
+      background: #1e293b;
+      color: #38bdf8;
+      border-color: #38bdf8;
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 12px;
+    }
+
+    @media (min-width: 1024px) {
+      main {
+        grid-template-columns: 1.15fr 0.85fr;
+        padding: 16px 24px;
+        height: calc(100vh - 75px);
+      }
+    }
+
+    /* Terminal Simulator Pane */
+    .terminal-pane {
+      background: #050811;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.7);
+    }
+
+    .term-titlebar {
+      background: #1e293b;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      border-bottom: 1px solid #334155;
+    }
+
+    .term-controls {
+      display: flex;
+      gap: 5px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-green { background: #22c55e; }
+
+    /* The curses-like window */
+    .screen-area {
+      flex: 1;
+      background: var(--term-bg);
+      color: var(--term-fg);
+      font-family: "Courier New", Courier, monospace;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      user-select: none;
+      min-height: 400px;
+    }
+
+    @media (min-width: 768px) {
+      .screen-area { padding: 18px; min-height: 480px; }
+    }
+
+    .box-frame {
+      border: 2px solid var(--term-border);
+      padding: 10px 12px;
+      background: var(--term-bg);
+      margin-bottom: 8px;
+      min-height: 340px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .screen-header {
+      font-weight: bold;
+      text-align: center;
+      color: var(--term-accent);
+      border-bottom: 1px solid var(--term-border);
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+    }
+
+    .screen-text {
+      font-size: 0.85rem;
+      line-height: 1.35;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+
+    @media (min-width: 768px) {
+      .screen-text { font-size: 0.95rem; }
+      .screen-header { font-size: 1rem; }
+    }
+
+    .menu-options {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 6px 0;
+    }
+
+    .menu-item {
+      padding: 8px 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      border: 1px solid transparent;
+      transition: background 0.15s;
+    }
+
+    @media (min-width: 768px) {
+      .menu-item { padding: 5px 8px; font-size: 0.95rem; }
+    }
+
+    .menu-item:hover, .menu-item.selected {
+      background: var(--term-sel-bg);
+      color: var(--term-sel-fg);
+      font-weight: bold;
+    }
+
+    .menu-shortcut {
+      color: var(--term-accent);
+      margin-right: 10px;
+      font-weight: bold;
+      min-width: 20px;
+    }
+
+    .menu-item:hover .menu-shortcut, .menu-item.selected .menu-shortcut {
+      color: #000000;
+    }
+
+    .term-footer {
+      font-size: 0.78rem;
+      border-top: 1px solid var(--term-border);
+      padding-top: 6px;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* Mobile Friendly Buttons */
+    .term-nav-buttons {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .term-action-btn {
+      flex: 1;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      min-height: 42px;
+    }
+    .term-action-btn:active { background: #1d4ed8; }
+    .term-action-btn.secondary { background: #334155; }
+    .term-action-btn.secondary:active { background: #1e293b; }
+
+    /* Side / Info Pane */
+    .info-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .card-title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-color);
+    }
+
+    .explanation-content {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+
+    .explanation-content p {
+      margin-bottom: 8px;
+    }
+
+    .callout-box {
+      border-left: 4px solid var(--accent-color);
+      background: rgba(56, 189, 248, 0.1);
+      padding: 10px 12px;
+      border-radius: 0 4px 4px 0;
+      margin: 10px 0;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .callout-box.warn {
+      border-left-color: var(--warning);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .callout-box.danger {
+      border-left-color: var(--danger);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    /* Disk layout visualizer */
+    .disk-map {
+      display: flex;
+      width: 100%;
+      height: 44px;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 10px 0 8px 0;
+      border: 1px solid #334155;
+    }
+
+    .disk-part {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.68rem;
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      position: relative;
+    }
+
+    .part-efi { background: #3b82f6; width: 6%; }
+    .part-win { background: #0ea5e9; width: 45%; }
+    .part-data { background: #64748b; width: 20%; }
+    .part-deb { background: #e11d48; width: 15%; }
+    .part-nbsd { background: #f97316; width: 14%; border: 2px dashed #ffff55; }
+
+    .partition-legend {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      font-size: 0.75rem;
+      margin-top: 8px;
+    }
+
+    @media (min-width: 480px) {
+      .partition-legend { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .hw-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: bold;
+      margin-right: 4px;
+    }
+    .hw-ok { background: #166534; color: #bbf7d0; }
+    .hw-warn { background: #854d0e; color: #fef08a; }
+
+    /* Manual Tab modal / content */
+    #manualSection {
+      display: none;
+    }
+
+    .step-guide {
+      background: #0f172a;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #1e293b;
+    }
+
+    .step-guide h4 {
+      color: #38bdf8;
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    code {
+      background: #000;
+      color: #ffff55;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      word-break: break-all;
+    }
+
+    pre {
+      background: #000;
+      color: #38bdf8;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      overflow-x: auto;
+      margin: 8px 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 8 6 4-6 4Z"/></svg>
+      <span>NetBSD 11.0 sysinst</span>
+      <span class="badge-ver">v11.0</span>
+      <span class="badge-lang" id="termLangBadge">English (Oficial)</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-btn active" id="btnTabSim" onclick="switchView('sim')">🖥️ Simulador</button>
+      <button class="nav-btn" id="btnTabManual" onclick="switchView('manual')">📖 Manual Triple-Boot</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Pane: Terminal Interactive Simulator -->
+    <div class="terminal-pane" id="simPane">
+      <div class="term-titlebar">
+        <span>sysinst (amd64 curses)</span>
+        <div class="term-controls">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+        </div>
+      </div>
+
+      <div class="screen-area" id="screenBox">
+        <div class="box-frame">
+          <div class="screen-header" id="screenTitle">NetBSD-11.0 Install System</div>
+          <div class="screen-text" id="screenPrompt"></div>
+          <ul class="menu-options" id="menuList"></ul>
+        </div>
+        <div class="term-footer">
+          <span id="termFooterHint">[Toca una opción o presiona Enter]</span>
+          <span id="stepIndicator">Paso 1 de 9</span>
+        </div>
+      </div>
+
+      <div class="term-nav-buttons">
+        <button class="term-action-btn secondary" onclick="prevScreen()">⬅️ Atrás</button>
+        <button class="term-action-btn" onclick="executeSelectedOption()">Continuar ↵</button>
+        <button class="term-action-btn secondary" onclick="resetSimulator()">🔄 Reiniciar</button>
+      </div>
+    </div>
+
+    <!-- Right Pane: Contextual Explanations ALWAYS IN SPANISH -->
+    <div class="info-pane" id="contextPane">
+      
+      <!-- Current Step Explanation in Spanish -->
+      <div class="info-card">
+        <div class="card-title">
+          <span>💡 Explicación del Menú (Español)</span>
+        </div>
+        <div class="explanation-content" id="explanationText">
+          Cargando detalles...
+        </div>
+      </div>
+
+      <!-- Real Machine Layout -->
+      <div class="info-card">
+        <div class="card-title">
+          <span>💾 Particiones de Tu NVMe Samsung (512GB)</span>
+        </div>
+        <p style="font-size:0.78rem; color:#94a3b8; margin-bottom:6px;">
+          Detectadas en tu equipo real:
+        </p>
+        
+        <div class="disk-map">
+          <div class="disk-part part-efi" title="EFI System (200MB)">EFI</div>
+          <div class="disk-part part-win" title="C: Windows 11 (239GB)">Win11 (C:)</div>
+          <div class="disk-part part-data" title="D: Data NTFS (100GB)">Data (D:)</div>
+          <div class="disk-part part-deb" title="Debian GNU/Linux (100GB)">Debian</div>
+          <div class="disk-part part-nbsd" title="Espacio para NetBSD (~10.5GB)">NetBSD</div>
+        </div>
+
+        <div class="partition-legend">
+          <div class="legend-item"><span class="legend-color part-efi"></span> EFI (200 MB)</div>
+          <div class="legend-item"><span class="legend-color part-win"></span> Win 11 C: (239 GB) - PRESERVAR</div>
+          <div class="legend-item"><span class="legend-color part-data"></span> Datos D: (100 GB) - PRESERVAR</div>
+          <div class="legend-item"><span class="legend-color part-deb"></span> Debian (100 GB) - PRESERVAR</div>
+          <div class="legend-item"><span class="legend-color part-nbsd"></span> NetBSD 11.0 (Destino)</div>
+        </div>
+      </div>
+
+      <!-- Network and GPU Diagnostics -->
+      <div class="info-card">
+        <div class="card-title">
+          <span>📡 Diagnóstico de Red y Hardware</span>
+        </div>
+        <div style="font-size:0.82rem; line-height:1.5;">
+          <p><span class="hw-badge hw-ok">COMPATIBLE</span> <strong>GPU Radeon:</strong> Soportada nativamente con aceleración KMS gracias a <code>gpufw.tar.xz</code> descargado.</p>
+          <p style="margin-top:6px;"><span class="hw-badge hw-warn">OFFLINE REQUERIDO</span> <strong>Wi-Fi Realtek RTL8852BE:</strong> No soportada nativamente. Usa los sets offline o conecta el celular por USB tethering (interfaz <code>urndis0</code> con <code>dhcpcd urndis0</code>).</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Full Manual Mode Pane (shown via Tab) -->
+    <div class="info-pane" id="manualSection" style="grid-column: 1 / -1;">
+      <div class="info-card">
+        <div class="card-title" style="font-size: 1.15rem;">
+          📑 Guía Paso a Paso para Seguir desde el Celular (Triple-Boot)
+        </div>
+
+        <div class="callout-box warn">
+          <strong>Regla de Oro:</strong> En sysinst NUNCA selecciones <code>Use entire disk</code>. Selecciona siempre <code>Edit GPT partitions</code> y utiliza únicamente la partición libre para NetBSD.
+        </div>
+
+        <div class="step-guide">
+          <h4>1. Identificación de particiones en NetBSD:</h4>
+          <p>Tu disco NVMe se identifica como <code>ld0</code>:</p>
+          <pre>
+Partición 1 (EFI ESP)      -> GPT slice 1 (200MB, FAT32)
+Partición 3 (Windows 11 C:) -> GPT slice 3 (239GB, NTFS) -> NO TOCAR
+Partición 5 (Datos D:)      -> GPT slice 5 (100GB, NTFS) -> NO TOCAR
+Partición 6 (Debian Linux)  -> GPT slice 6 (100GB, ext4)  -> NO TOCAR
+Partición 8 (Libre)         -> Asignar a NetBSD FFS (Mount point /)
+          </pre>
+        </div>
+
+        <div class="step-guide">
+          <h4>2. Instalación 100% Offline (Sets descargados):</h4>
+          <p>Los paquetes están listos en la ISO o en tu carpeta local:</p>
+          <ul>
+            <li><strong>Opción ISO en USB:</strong> sysinst montará la unidad automáticamente al seleccionar <code>CD-ROM / DVD / USB installer image</code>.</li>
+            <li><strong>Opción carpeta sets_11.0:</strong> Si los copiaste a un pendrive FAT32, elige <code>Unmounted fs</code> -> partición <code>sd0e</code> (tipo <code>msdos</code>) -> carpeta <code>/sets_11.0</code>.</li>
+          </ul>
+        </div>
+
+        <div class="step-guide">
+          <h4>3. Configuración del Arranque Triple en Debian:</h4>
+          <p>Para no modificar el inicio de Windows ni sobreescribir el cargador de Debian:</p>
+          <ol style="margin-left: 20px; line-height: 1.6; font-size: 0.88rem;">
+            <li>En sysinst, elige <strong>Do not change the bootcode</strong>.</li>
+            <li>Al finalizar la instalación de NetBSD, reinicia e inicia tu <strong>Debian</strong> habitual.</li>
+            <li>En Debian, abre una terminal y edita el archivo:
+              <pre>sudo nano /etc/grub.d/40_custom</pre>
+            </li>
+            <li>Agrega al final las siguientes 5 líneas:
+              <pre>
+menuentry "NetBSD 11.0 (amd64)" {
+    insmod ufs2
+    set root=(hd0,gpt8)
+    knetbsd /netbsd --root=ld0a
+}
+              </pre>
+            </li>
+            <li>Ejecuta:
+              <pre>sudo update-grub</pre>
+            </li>
+          </ol>
+          <p>Al reiniciar, verás NetBSD 11.0, Debian y Windows en tu menú de GRUB.</p>
+        </div>
+
+        <div class="step-guide">
+          <h4>4. Internet en NetBSD con tu teléfono:</h4>
+          <p>Conecta tu móvil Android por cable USB y activa "Conexión compartida USB". En NetBSD escribe:</p>
+          <pre>
+ifconfig -a          # Verás la interfaz urndis0
+dhcpcd urndis0       # Obtener IP y navegación instantánea
+          </pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let userLanguageChoice = "en"; // 'en' or 'es'
+
+    const screensData = {
+      lang_select: {
+        en: {
+          title: "NetBSD-11.0 Install System",
+          prompt: "Choose your installation language / Elija su idioma:",
+          footer: "[Select an option and press Enter / Tap]",
+          options: [
+            { key: "a", label: "English (Standard / Official)", lang: "en", target: "main_menu" },
+            { key: "b", label: "Español (Traducción sysinst)", lang: "es", target: "main_menu" },
+            { key: "c", label: "Français", lang: "en", target: "main_menu" },
+            { key: "d", label: "Deutsch", lang: "en", target: "main_menu" }
+          ]
+        },
+        es: {
+          title: "Sistema de Instalación NetBSD-11.0",
+          prompt: "Elija el idioma de instalación:",
+          footer: "[Seleccione una opción y presione Enter / Tocar]",
+          options: [
+            { key: "a", label: "English (Estándar / Oficial)", lang: "en", target: "main_menu" },
+            { key: "b", label: "Español (Traducción sysinst)", lang: "es", target: "main_menu" },
+            { key: "c", label: "Français", lang: "en", target: "main_menu" },
+            { key: "d", label: "Deutsch", lang: "en", target: "main_menu" }
+          ]
+        },
+        step: "Paso 1 de 9 (Idioma)",
+        explanation: `
+          <p><strong>Pantalla inicial de sysinst (curses):</strong></p>
+          <p>NetBSD muestra esta pantalla al arrancar la ISO. Si seleccionas <strong>English</strong>, la terminal se mantendrá <strong>100% tal cual aparece en el instalador oficial en inglés</strong>, pero todo el panel explicativo de la derecha seguirá mostrándote cada concepto traducido y guiado en <strong>Español</strong>.</p>
+          <div class="callout-box">
+            <strong>Recomendación:</strong> Prueba elegir <em>English</em> para familiarizarte con las palabras exactas que verás al arrancar tu portátil con la ISO de NetBSD 11.0.
+          </div>
+        `
+      },
+      main_menu: {
+        en: {
+          title: "NetBSD-11.0 Install System",
+          prompt: "Welcome to sysinst, the NetBSD-11.0 system installation tool.\nThis program will help you install/upgrade NetBSD.\n\nWhat would you like to do?",
+          footer: "[Select an option and press Enter / Tap]",
+          options: [
+            { key: "a", label: "Install NetBSD to hard disk", target: "sel_disk" },
+            { key: "b", label: "Upgrade NetBSD on a hard disk", target: "main_menu" },
+            { key: "c", label: "Re-install sets or install additional sets", target: "source_media" },
+            { key: "d", label: "Reboot the computer", target: "lang_select" },
+            { key: "x", label: "Exit Install System (drop to shell)", target: "lang_select" }
+          ]
+        },
+        es: {
+          title: "Sistema de Instalación NetBSD-11.0",
+          prompt: "Bienvenido a sysinst, la herramienta de instalación de NetBSD-11.0.\nEste programa le asistirá en la instalación o actualización de NetBSD.\n\n¿Qué desea hacer?",
+          footer: "[Seleccione una opción y presione Enter / Tocar]",
+          options: [
+            { key: "a", label: "Instalar NetBSD en el disco duro", target: "sel_disk" },
+            { key: "b", label: "Actualizar NetBSD en un disco duro", target: "main_menu" },
+            { key: "c", label: "Reinstalar o instalar conjuntos adicionales", target: "source_media" },
+            { key: "d", label: "Reiniciar la máquina", target: "lang_select" },
+            { key: "x", label: "Salir del sistema de instalación (shell)", target: "lang_select" }
+          ]
+        },
+        step: "Paso 2 de 9 (Menú Principal)",
+        explanation: `
+          <p><strong>Explicación del Menú Principal:</strong></p>
+          <ul>
+            <li><code>Install NetBSD to hard disk</code>: Inicia el asistente de particionado e instalación limpia en una partición del disco duro.</li>
+            <li><code>Upgrade NetBSD</code>: Conserva archivos de configuración en <code>/etc</code> e instala nuevos binarios sobre una versión anterior.</li>
+            <li><code>Re-install sets</code>: Sirve si más adelante deseas instalar manualmente los componentes gráficos X11 o los compiladores que ya descargaste en tu carpeta <code>sets_11.0</code>.</li>
+          </ul>
+        `
+      },
+      sel_disk: {
+        en: {
+          title: "Select Destination Disk",
+          prompt: "Available disks detected on your system:\nOn which disk do you want to install NetBSD?",
+          footer: "[Choose your NVMe SSD disk]",
+          options: [
+            { key: "a", label: "ld0 (476G, SAMSUNG MZVL8512 - Internal NVMe SSD)", target: "part_scheme" },
+            { key: "b", label: "sd0 (14G, SanDisk USB Installer Drive)", target: "warn_usb" }
+          ]
+        },
+        es: {
+          title: "Seleccionar Disco de Destino",
+          prompt: "Discos disponibles detectados en su sistema:\n¿En qué disco desea instalar NetBSD?",
+          footer: "[Elija su disco SSD NVMe interno]",
+          options: [
+            { key: "a", label: "ld0 (476G, SAMSUNG MZVL8512 - SSD NVMe interno)", target: "part_scheme" },
+            { key: "b", label: "sd0 (14G, Unidad USB SanDisk de instalación)", target: "warn_usb" }
+          ]
+        },
+        step: "Paso 3 de 9 (Selección de Disco)",
+        explanation: `
+          <p><strong>Nomenclatura de discos en NetBSD:</strong></p>
+          <ul>
+            <li><code>ld</code> (Logical Disk): Es el nombre que asigna el controlador de NetBSD a unidades NVMe modernas (como tu Samsung de 512GB).</li>
+            <li><code>sd</code> (SCSI/USB Disk): Asignado a memorias USB y discos externos.</li>
+          </ul>
+          <div class="callout-box warn">
+            <strong>Atención:</strong> Debes seleccionar <code>ld0</code>. Si eliges <code>sd0</code> estarías formateando la memoria USB desde donde iniciaste el instalador.
+          </div>
+        `
+      },
+      warn_usb: {
+        en: {
+          title: "Safety Warning: Removable USB Disk",
+          prompt: "WARNING: You selected the USB boot drive (sd0).\nInstalling NetBSD here will overwrite your boot media.\n\nDo you want to return and select the internal NVMe SSD?",
+          footer: "[Press Enter to go back safely]",
+          options: [
+            { key: "a", label: "Return and select internal NVMe SSD (ld0)", target: "sel_disk" }
+          ]
+        },
+        es: {
+          title: "Aviso de Seguridad: Disco USB Extraíble",
+          prompt: "ADVERTENCIA: Ha seleccionado la memoria USB de arranque (sd0).\nInstalar aquí sobreescribirá el medio de arranque.\n\n¿Desea regresar y seleccionar el SSD NVMe interno?",
+          footer: "[Presione Enter para volver con seguridad]",
+          options: [
+            { key: "a", label: "Regresar y elegir el disco SSD NVMe interno (ld0)", target: "sel_disk" }
+          ]
+        },
+        step: "Aviso de Seguridad",
+        explanation: `
+          <p>Esta protección evita que destruyas la memoria USB donde tienes grabada la ISO o los sets de instalación.</p>
+        `
+      },
+      part_scheme: {
+        en: {
+          title: "Partition Scheme Selection",
+          prompt: "Disk ld0 already contains an existing partition table.\nSelect how you want to partition this disk:",
+          footer: "[CRITICAL STEP: Do NOT wipe your drive!]",
+          options: [
+            { key: "a", label: "Edit GPT partitions (Preserve Windows, Debian and Data)", target: "edit_gpt" },
+            { key: "b", label: "Use entire disk (DANGER: Completely wipes all OSes!)", target: "warn_wipe" },
+            { key: "c", label: "Use Master Boot Record (MBR) partition table", target: "part_scheme" }
+          ]
+        },
+        es: {
+          title: "Esquema de Particionado",
+          prompt: "El disco ld0 ya contiene una tabla de particiones existente.\nSeleccione cómo desea particionar este disco:",
+          footer: "[PASO CRÍTICO: ¡No borres todo tu disco!]",
+          options: [
+            { key: "a", label: "Editar particiones GPT (Conservar Windows, Debian y Datos)", target: "edit_gpt" },
+            { key: "b", label: "Usar todo el disco (PELIGRO: ¡Borra todos los sistemas!)", target: "warn_wipe" },
+            { key: "c", label: "Usar tabla de particiones Master Boot Record (MBR)", target: "part_scheme" }
+          ]
+        },
+        step: "Paso 4 de 9 (Esquema de Particionado)",
+        explanation: `
+          <div class="callout-box danger">
+            <strong>ADVERTENCIA DE SEGURIDAD (Windows 11 + Debian):</strong><br>
+            NUNCA elijas <code>Use entire disk</code>. Si lo haces, NetBSD formateará las 512GB completas, destruyendo Windows 11, tu Debian Linux y tu partición D: de datos.
+          </div>
+          <p>La opción correcta es <strong>Edit GPT partitions</strong>. Tu portátil usa UEFI y tabla GPT, por lo que esta opción nos permite entrar al editor y tocar <em>exclusivamente</em> la partición designada para NetBSD.</p>
+        `
+      },
+      warn_wipe: {
+        en: {
+          title: "DESTRUCTIVE ACTION ABORTED",
+          prompt: "CRITICAL: 'Use entire disk' will wipe all partitions and data!\nWindows 11, Debian Linux, and Data (D:) would be lost.\n\nDo you want to cancel and use 'Edit GPT partitions' instead?",
+          footer: "[Press Enter to stay safe]",
+          options: [
+            { key: "a", label: "Cancel and use 'Edit GPT partitions'", target: "edit_gpt" }
+          ]
+        },
+        es: {
+          title: "ACCIÓN DESTRUCTIVA ABORTADA",
+          prompt: "CRÍTICO: 'Usar todo el disco' borrará todas las particiones y datos.\nWindows 11, Debian Linux y Datos (D:) se perderían.\n\n¿Desea cancelar y usar 'Editar particiones GPT'?",
+          footer: "[Presione Enter para mantener sus datos a salvo]",
+          options: [
+            { key: "a", label: "Cancelar y usar 'Editar particiones GPT'", target: "edit_gpt" }
+          ]
+        },
+        step: "Protección contra Borrado",
+        explanation: `
+          <p><strong style="color:#ef4444;">¡Alerta prevenida con éxito!</strong> El simulador te redirige automáticamente a <em>Edit GPT partitions</em> para proteger tus sistemas operativos.</p>
+        `
+      },
+      edit_gpt: {
+        en: {
+          title: "GPT Partition Editor (ld0 - 512GB)",
+          prompt: "Current GPT partition layout on ld0:\n1: EFI System Partition (200MB, FAT32)        [PROTECTED]\n3: Microsoft Basic Data (Windows 11 C: 239GB) [PROTECTED]\n5: Microsoft Basic Data (Data D: 100GB)       [PROTECTED]\n6: Linux Filesystem (Debian GNU/Linux 100GB)  [PROTECTED]\n8: Available Unused Space (~10.5GB)\n\nSelect action:",
+          footer: "[Choose partition 8 for NetBSD]",
+          options: [
+            { key: "a", label: "Configure Partition 8 as NetBSD FFS (Mount point /)", target: "mount_points" },
+            { key: "b", label: "Edit Partition 3 (Windows 11) -> [PROTECTED ACTION]", target: "edit_gpt" },
+            { key: "c", label: "Edit Partition 6 (Debian Linux) -> [PROTECTED ACTION]", target: "edit_gpt" },
+            { key: "x", label: "Partition sizes ok (Proceed to formatting /)", target: "mount_points" }
+          ]
+        },
+        es: {
+          title: "Editor de Particiones GPT (ld0 - 512GB)",
+          prompt: "Esquema actual de particiones GPT en ld0:\n1: Partición del Sistema EFI (200MB, FAT32)       [PROTEGIDA]\n3: Microsoft Basic Data (Windows 11 C: 239GB)     [PROTEGIDA]\n5: Microsoft Basic Data (Datos D: 100GB)          [PROTEGIDA]\n6: Linux Filesystem (Debian GNU/Linux 100GB)      [PROTEGIDA]\n8: Espacio disponible sin asignar (~10.5GB)\n\nSeleccione la acción:",
+          footer: "[Elija la partición 8 para NetBSD]",
+          options: [
+            { key: "a", label: "Configurar Partición 8 como NetBSD FFS (Montaje /)", target: "mount_points" },
+            { key: "b", label: "Editar Partición 3 (Windows 11) -> [ACCIÓN PROTEGIDA]", target: "edit_gpt" },
+            { key: "c", label: "Editar Partición 6 (Debian Linux) -> [ACCIÓN PROTEGIDA]", target: "edit_gpt" },
+            { key: "x", label: "Tamaños correctos (Proceder al formateo de /)", target: "mount_points" }
+          ]
+        },
+        step: "Paso 5 de 9 (Editor GPT)",
+        explanation: `
+          <p><strong>Tu mapa real de particiones:</strong></p>
+          <div class="callout-box">
+            En <code>sysinst</code> modificas el tipo de partición asignándolo a <code>NetBSD FFS</code> (Fast File System) y estableces el <em>mount point</em> en <code>/</code> (raíz).<br>
+            Las particiones de Windows (C: y D:), la partición EFI y tu partición de Debian quedan intactas.
+          </div>
+        `
+      },
+      mount_points: {
+        en: {
+          title: "File System Mount and Parameters",
+          prompt: "Filesystem creation parameters for NetBSD partition:\n\nDevice: /dev/ld0h (GPT part 8)\nFilesystem Type: FFSv2 (Fast File System version 2)\nMount options: log (WAPBL metadata logging enabled)\nMount point: /\n\nAre these parameters acceptable?",
+          footer: "[Select 'Yes' to accept FFSv2 logging]",
+          options: [
+            { key: "a", label: "Yes, partition sizes and parameters are ok", target: "boot_prompt" },
+            { key: "b", label: "No, return to partition editor", target: "edit_gpt" }
+          ]
+        },
+        es: {
+          title: "Montaje y Parámetros del Sistema de Archivos",
+          prompt: "Parámetros de creación para la partición de NetBSD:\n\nDispositivo: /dev/ld0h (partición GPT 8)\nTipo de sistema de archivos: FFSv2 (Fast File System v2)\nOpciones de montaje: log (WAPBL logging activado)\nPunto de montaje: /\n\n¿Son aceptables estos parámetros?",
+          footer: "[Seleccione 'Sí' para aceptar FFSv2 con logging]",
+          options: [
+            { key: "a", label: "Sí, tamaños y parámetros correctos", target: "boot_prompt" },
+            { key: "b", label: "No, regresar al editor de particiones", target: "edit_gpt" }
+          ]
+        },
+        step: "Paso 6 de 9 (Parámetros FFS2)",
+        explanation: `
+          <p><strong>¿Qué significa FFSv2 con log (WAPBL)?</strong></p>
+          <p>Es el sistema de archivos nativo y más maduro de NetBSD. Al tener la opción <code>log</code> (WAPBL - Write Ahead Physical Block Logging) activada, si se corta la corriente o se apaga la laptop forzosamente, el sistema de ficheros no se corrompe y arranca de inmediato sin demoras de <code>fsck</code>.</p>
+        `
+      },
+      boot_prompt: {
+        en: {
+          title: "Bootloader Configuration (UEFI)",
+          prompt: "An existing EFI System Partition (ESP) was detected.\nHow do you want to configure the system bootcode?",
+          footer: "[CRITICAL FOR TRIPLE BOOT: Choose option 'a']",
+          options: [
+            { key: "a", label: "Do not change the bootcode (Recommended: boot via Debian GRUB)", target: "sets_select" },
+            { key: "b", label: "Install NetBSD bootcode to EFI partition (overwrites default EFI handler)", target: "sets_select" }
+          ]
+        },
+        es: {
+          title: "Configuración del Cargador de Arranque (UEFI)",
+          prompt: "Se detectó una partición del sistema EFI (ESP) existente.\n¿Cómo desea configurar el arranque del sistema?",
+          footer: "[CRÍTICO PARA TRIPLE BOOT: Elija la opción 'a']",
+          options: [
+            { key: "a", label: "No alterar el código de arranque (Recomendado: arrancar vía GRUB de Debian)", target: "sets_select" },
+            { key: "b", label: "Instalar código de arranque NetBSD en EFI (sustituye el gestor por defecto)", target: "sets_select" }
+          ]
+        },
+        step: "Paso 7 de 9 (Gestor de Arranque)",
+        explanation: `
+          <p><strong>Convivencia perfecta con Debian y Windows:</strong></p>
+          <div class="callout-box">
+            Al seleccionar <strong>Do not change the bootcode</strong> (No alterar el arranque):
+            <ol style="margin-left:18px; margin-top:6px;">
+              <li>Tu partición EFI no sufre modificaciones de orden de prioridad UEFI.</li>
+              <li>Tu computadora continuará arrancando con tu menú familiar de <strong>Debian GRUB</strong>.</li>
+              <li>En la sección del <strong>Manual</strong> te dejamos la entrada de 4 líneas que debes pegar en Debian para que NetBSD aparezca en el menú de GRUB.</li>
+            </ol>
+          </div>
+        `
+      },
+      sets_select: {
+        en: {
+          title: "Select Distribution Sets",
+          prompt: "The NetBSD distribution is broken into collections of utility\nprograms and libraries called 'sets'.\n\nWhich distribution sets do you want to install?",
+          footer: "[Full installation includes Base, X11, Comp and Drivers]",
+          options: [
+            { key: "a", label: "Full installation (Includes Base, X11, Comp, Man, GPU firmware)", target: "source_media" },
+            { key: "b", label: "Installation without X11 (CLI only)", target: "source_media" },
+            { key: "c", label: "Minimal installation", target: "source_media" },
+            { key: "d", label: "Custom set selection", target: "source_media" }
+          ]
+        },
+        es: {
+          title: "Selección de Conjuntos de Distribución (Sets)",
+          prompt: "La distribución NetBSD está dividida en colecciones de programas\ny librerías llamadas 'sets'.\n\n¿Qué conjuntos desea instalar?",
+          footer: "[Full installation incluye Base, X11, Comp y Drivers]",
+          options: [
+            { key: "a", label: "Instalación Completa (Incluye Base, X11, Comp, Manuales, Firmware GPU)", target: "source_media" },
+            { key: "b", label: "Instalación sin X11 (Solo modo texto)", target: "source_media" },
+            { key: "c", label: "Instalación mínima", target: "source_media" },
+            { key: "d", label: "Selección personalizada de conjuntos", target: "source_media" }
+          ]
+        },
+        step: "Paso 8 de 9 (Selección de Sets)",
+        explanation: `
+          <p><strong>Conjuntos que ya tenemos listos en tu disco:</strong></p>
+          <p>Como ya descargamos todos los archivos <code>.tar.xz</code> verificados con SHA512, puedes seleccionar con total confianza <strong>Full installation</strong>.</p>
+          <p>Esto instalará:</p>
+          <ul>
+            <li><code>base.tar.xz</code> y <code>etc.tar.xz</code>: Sistema operativo base y comandos de red.</li>
+            <li><code>gpufw.tar.xz</code>: Microcódigo de tu tarjeta gráfica AMD Radeon.</li>
+            <li><code>xbase.tar.xz</code>, <code>xserver.tar.xz</code>, <code>xfont.tar.xz</code>: Entorno gráfico X.Org.</li>
+            <li><code>man.tar.xz</code> y <code>comp.tar.xz</code>: Toda la documentación y compiladores offline.</li>
+          </ul>
+        `
+      },
+      source_media: {
+        en: {
+          title: "Select Media for Distribution Sets (100% Offline)",
+          prompt: "Where are the NetBSD distribution sets located?",
+          footer: "[Select CD-ROM/USB image or Local directory for offline install]",
+          options: [
+            { key: "a", label: "CD-ROM / DVD / USB installer image (Default ISO path)", target: "extract_screen" },
+            { key: "b", label: "Local directory (Path: /sets_11.0 on mounted drive)", target: "extract_screen" },
+            { key: "c", label: "Unmounted fs (FAT32/MSDOS USB drive slice, e.g. /dev/sd0e)", target: "extract_screen" }
+          ]
+        },
+        es: {
+          title: "Origen de los Conjuntos (Instalación 100% Offline)",
+          prompt: "¿Dónde se encuentran almacenados los conjuntos de NetBSD?",
+          footer: "[Seleccione CD-ROM/USB o directorio local para modo offline]",
+          options: [
+            { key: "a", label: "CD-ROM / DVD / Imagen USB (Ruta por defecto de la ISO)", target: "extract_screen" },
+            { key: "b", label: "Directorio local (Ruta: /sets_11.0 en unidad montada)", target: "extract_screen" },
+            { key: "c", label: "Sistema de archivos sin montar (Memoria USB FAT32, ej. /dev/sd0e)", target: "extract_screen" }
+          ]
+        },
+        step: "Paso 9 de 9 (Medio Offline)",
+        explanation: `
+          <p><strong>¿Cómo hacer la instalación 100% desconectada de internet?</strong></p>
+          <ul>
+            <li><strong>Si grabaste la ISO descargada (<code>NetBSD-11.0-amd64.iso</code>):</strong> Eliges la opción <code>CD-ROM / DVD / USB installer image</code>. El instalador montará automáticamente la unidad y extraerá los paquetes sin pedir conexión a internet.</li>
+            <li><strong>Si copiaste los ficheros sueltos de <code>sets_11.0</code>:</strong> Eliges <code>Unmounted fs</code>, escribes el nombre del disco (ej: <code>sd0e</code>), el tipo de sistema de ficheros (<code>msdos</code>) y la carpeta (<code>/sets_11.0</code>).</li>
+          </ul>
+        `
+      },
+      extract_screen: {
+        en: {
+          title: "Extracting Distribution Sets...",
+          prompt: "Extracting base.tar.xz... [100% OK]\nExtracting etc.tar.xz... [100% OK]\nExtracting kern-GENERIC.tar.xz... [100% OK]\nExtracting modules.tar.xz... [100% OK]\nExtracting gpufw.tar.xz (AMD Radeon Firmware)... [100% OK]\nExtracting xserver.tar.xz... [100% OK]\nExtracting xbase.tar.xz... [100% OK]\nExtracting man.tar.xz... [100% OK]\n\nAll sets extracted successfully into target partition!",
+          footer: "[Press Enter or Tap to proceed to post-configuration]",
+          options: [
+            { key: "a", label: "Hit enter to continue to post-installation configuration", target: "post_config" }
+          ]
+        },
+        es: {
+          title: "Extrayendo Conjuntos de Distribución...",
+          prompt: "Extrayendo base.tar.xz... [100% OK]\nExtrayendo etc.tar.xz... [100% OK]\nExtrayendo kern-GENERIC.tar.xz... [100% OK]\nExtrayendo modules.tar.xz... [100% OK]\nExtrayendo gpufw.tar.xz (Firmware AMD Radeon)... [100% OK]\nExtrayendo xserver.tar.xz... [100% OK]\nExtrayendo xbase.tar.xz... [100% OK]\nExtrayendo man.tar.xz... [100% OK]\n\n¡Todos los conjuntos se extrajeron con éxito en la partición!",
+          footer: "[Presione Enter o Toque para ir a la post-configuración]",
+          options: [
+            { key: "a", label: "Presione enter para continuar con la post-configuración", target: "post_config" }
+          ]
+        },
+        step: "Extracción Offline",
+        explanation: `
+          <p>En este instante <code>sysinst</code> descomprime directamente en tu disco SSD los ejecutables, librerías, drivers del kernel y componentes de video.</p>
+        `
+      },
+      post_config: {
+        en: {
+          title: "Post-Installation System Configuration",
+          prompt: "Your NetBSD 11.0 installation is almost ready!\nYou can configure additional system settings now:",
+          footer: "[Select configuration options]",
+          options: [
+            { key: "a", label: "Configure network interfaces (DHCP / urndis for phone tethering)", target: "finish" },
+            { key: "b", label: "Set root password and add non-root user", target: "finish" },
+            { key: "c", label: "Set timezone (America/Bogota)", target: "finish" },
+            { key: "x", label: "Finished configuration (Ready to boot)", target: "finish" }
+          ]
+        },
+        es: {
+          title: "Configuración Post-Instalación del Sistema",
+          prompt: "¡Su instalación de NetBSD 11.0 está casi lista!\nPuede ajustar configuraciones adicionales ahora:",
+          footer: "[Seleccione las opciones de configuración]",
+          options: [
+            { key: "a", label: "Configurar interfaces de red (DHCP / urndis por USB tethering)", target: "finish" },
+            { key: "b", label: "Establecer clave de root y añadir usuario estándar", target: "finish" },
+            { key: "c", label: "Configurar zona horaria (America/Bogota)", target: "finish" },
+            { key: "x", label: "Configuración terminada (Listo para reiniciar)", target: "finish" }
+          ]
+        },
+        step: "Post-Instalación",
+        explanation: `
+          <p><strong>Paso final de personalización:</strong></p>
+          <ul>
+            <li><strong>Usuario y Root:</strong> Crea tu usuario normal y agrégalo al grupo <code>wheel</code> para poder ejecutar <code>su</code> o <code>doas</code>.</li>
+            <li><strong>Red:</strong> Puedes dejar habilitado el servicio <code>dhcpcd</code> para que cuando conectes tu móvil por USB tethering o un adaptador Ethernet, tome IP inmediatamente.</li>
+          </ul>
+        `
+      },
+      finish: {
+        en: {
+          title: "Installation Successfully Completed",
+          prompt: "The installation of NetBSD-11.0 is now complete!\n\nYour existing operating systems (Windows 11 and Debian) remain untouched.\nYou may now reboot your computer.",
+          footer: "[Installation complete]",
+          options: [
+            { key: "a", label: "Restart simulator from beginning", target: "lang_select" },
+            { key: "b", label: "Switch to Debian GRUB Triple-Boot Manual tab", target: "manual_tab" }
+          ]
+        },
+        es: {
+          title: "Instalación Completada con Éxito",
+          prompt: "¡La instalación de NetBSD-11.0 ha finalizado con éxito!\n\nSus sistemas operativos previos (Windows 11 y Debian) no sufrieron alteración.\nAhora puede reiniciar su equipo.",
+          footer: "[Instalación completada]",
+          options: [
+            { key: "a", label: "Reiniciar el simulador desde el inicio", target: "lang_select" },
+            { key: "b", label: "Ir a la pestaña del Manual para GRUB en Debian", target: "manual_tab" }
+          ]
+        },
+        step: "Completado",
+        explanation: `
+          <div class="callout-box" style="border-left-color: #22c55e; background: rgba(34, 197, 94, 0.1);">
+            <strong>¡Excelente!</strong> Has navegado la simulación completa. Recuerda consultar la pestaña superior <em>Manual Triple-Boot</em> para ver el comando de GRUB que te permitirá iniciar NetBSD junto a Debian y Windows.
+          </div>
+        `
+      }
+    };
+
+    let currentScreenKey = "lang_select";
+    let historyStack = [];
+    let selectedOptionIndex = 0;
+
+    function renderScreen(key) {
+      const screenNode = screensData[key];
+      if (!screenNode) return;
+
+      currentScreenKey = key;
+      selectedOptionIndex = 0;
+
+      const langData = screenNode[userLanguageChoice] || screenNode["en"];
+
+      document.getElementById("screenTitle").innerText = langData.title;
+      document.getElementById("screenPrompt").innerText = langData.prompt;
+      document.getElementById("termFooterHint").innerText = langData.footer || "[Toca una opción o presiona Enter]";
+      document.getElementById("stepIndicator").innerText = screenNode.step;
+      
+      // Explanation ALWAYS in Spanish
+      document.getElementById("explanationText").innerHTML = screenNode.explanation;
+
+      // Update badge
+      document.getElementById("termLangBadge").innerText = (userLanguageChoice === "en")
+        ? "English (Oficial sysinst)"
+        : "Español";
+
+      const menuList = document.getElementById("menuList");
+      menuList.innerHTML = "";
+
+      langData.options.forEach((opt, idx) => {
+        const li = document.createElement("li");
+        li.className = "menu-item" + (idx === 0 ? " selected" : "");
+        li.innerHTML = `<span class="menu-shortcut">${opt.key}&gt;</span> <span>${opt.label}</span>`;
+        li.onclick = () => {
+          selectItem(idx);
+          executeSelectedOption();
+        };
+        menuList.appendChild(li);
+      });
+    }
+
+    function selectItem(idx) {
+      selectedOptionIndex = idx;
+      const items = document.querySelectorAll(".menu-item");
+      items.forEach((item, i) => {
+        if (i === idx) item.classList.add("selected");
+        else item.classList.remove("selected");
+      });
+    }
+
+    function executeSelectedOption() {
+      const screenNode = screensData[currentScreenKey];
+      if (!screenNode) return;
+
+      const langData = screenNode[userLanguageChoice] || screenNode["en"];
+      const chosen = langData.options[selectedOptionIndex];
+      if (!chosen) return;
+
+      if (currentScreenKey === "lang_select" && chosen.lang) {
+        userLanguageChoice = chosen.lang;
+      }
+
+      if (chosen.target === "manual_tab") {
+        switchView("manual");
+        return;
+      }
+
+      historyStack.push({ key: currentScreenKey, lang: userLanguageChoice });
+      renderScreen(chosen.target);
+    }
+
+    function prevScreen() {
+      if (historyStack.length > 0) {
+        const prev = historyStack.pop();
+        userLanguageChoice = prev.lang;
+        renderScreen(prev.key);
+      }
+    }
+
+    function resetSimulator() {
+      historyStack = [];
+      userLanguageChoice = "en";
+      renderScreen("lang_select");
+    }
+
+    function switchView(mode) {
+      const btnSim = document.getElementById("btnTabSim");
+      const btnMan = document.getElementById("btnTabManual");
+      const simPane = document.getElementById("simPane");
+      const contextPane = document.getElementById("contextPane");
+      const manualSec = document.getElementById("manualSection");
+
+      if (mode === "sim") {
+        btnSim.classList.add("active");
+        btnMan.classList.remove("active");
+        simPane.style.display = "flex";
+        contextPane.style.display = "flex";
+        manualSec.style.display = "none";
+      } else {
+        btnMan.classList.add("active");
+        btnSim.classList.remove("active");
+        simPane.style.display = "none";
+        contextPane.style.display = "none";
+        manualSec.style.display = "flex";
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // Keyboard navigation
+    window.addEventListener("keydown", (e) => {
+      const screenNode = screensData[currentScreenKey];
+      if (!screenNode || document.getElementById("simPane").style.display === "none") return;
+
+      const langData = screenNode[userLanguageChoice] || screenNode["en"];
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        selectedOptionIndex = (selectedOptionIndex + 1) % langData.options.length;
+        selectItem(selectedOptionIndex);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        selectedOptionIndex = (selectedOptionIndex - 1 + langData.options.length) % langData.options.length;
+        selectItem(selectedOptionIndex);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        executeSelectedOption();
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        prevScreen();
+      }
+    });
+
+    // Render initial screen
+    renderScreen("lang_select");
+  </script>
+</body>
+</html>
