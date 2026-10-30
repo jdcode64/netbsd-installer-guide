@@ -1,7 +1,11 @@
-﻿# Gitignore for netbsd project: ignore giant binaries (sets and iso)
+﻿# Gitignore para NetBSD Project
 sets/
 sets_11.0/
 iso/
 *.iso
+*.img
+*.img.gz
 *.tar.xz
 *.log
+rufus.exe
+rufus.ini
